@@ -17,10 +17,8 @@ public class Drivetrain {
         leftBack = hardwareMap.get(DcMotorEx.class, "leftBack");
         rightBack = hardwareMap.get(DcMotorEx.class, "rightBack");
         rightFront = hardwareMap.get(DcMotorEx.class, "rightFront");
-        rightBack.setDirection(DcMotorSimple.Direction.REVERSE);
-        rightFront.setDirection(DcMotorSimple.Direction.REVERSE);
-
-
+        leftBack.setDirection(DcMotorSimple.Direction.REVERSE);
+        leftFront.setDirection(DcMotorSimple.Direction.REVERSE);
     }
 
     public void stopMotor(){
@@ -34,10 +32,22 @@ public class Drivetrain {
         rightFront.setPower(0);
 
     }
+    public void brakeMotors(){
+        leftFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        leftBack.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        rightFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        rightBack.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        leftFront.setPower(0);
+        leftBack.setPower(0);
+        rightFront.setPower(0);
+        rightBack.setPower(0);
+    }
+
     public void driveMotors(double speed, double turn, double strafe){
+        speed = speed * 0.85;
         leftFront.setPower(-1 * (speed - (turn + strafe)));
         leftBack.setPower(-1 * (speed - (turn - strafe)));
-        rightFront.setPower(-1 * (speed + turn + strafe));
+        rightFront.setPower(-1 * (speed + (turn + strafe)));
         rightBack.setPower(-1 * (speed + (turn - strafe)));
 
     }

@@ -8,55 +8,38 @@ import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.Servo;
 
 import java.util.List;
 
 public class Turret {
     public Limelight3A limelight;
-    public Servo turret;
+    public DcMotorEx turret;
+
     public Turret(HardwareMap hardwareMap) {
-        limelight = hardwareMap.get(Limelight3A.class, "Limelight");
-        limelight.pipelineSwitch(0);
-        turret = hardwareMap.get(Servo.class, "axon");
+//        limelight = hardwareMap.get(Limelight3A.class, "Limelight");
+//        limelight.pipelineSwitch(0);
 
-        limelight.start();
+        turret = hardwareMap.get(DcMotorEx.class, "turret");
+        turret.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-    }
-    double conversion = 360/0.513;
-    public void turnTo(double degrees){
-        double ticks = degrees/conversion;
-        turret.setPosition(ticks+0.505);
-
-    }
-    double xAngle = 0;
-
-    private static final double DEADBAND = 1.0; // degrees
-
-    double currAngle = 0;
-    public void TurnToAT() {
-        LLResult result = limelight.getLatestResult();
-        if (result == null || !result.isValid()) return;
-
-        double tx = result.getTx();
-
-        if (Math.abs(tx) < DEADBAND) return;
-
-        currAngle = currAngle - (tx * conversion);
-        turnTo(currAngle);
-    }
-    public double returnTx(){
-        LLResult result = limelight.getLatestResult();
-        if (result != null && result.isValid()){
-            return result.getTx();
-        }
-        else{
-            return 1000;
-        }
-
-
+//        limelight.start();
 
     }
 
+    public static double turretSpeed = -0.2;
 
+    // positive power = counterclockwise
+    public void spinTurret(double pwr) {
+        turret.setPower(pwr * turretSpeed);
+    }
+
+//    public double returnTx(){
+//        LLResult result = limelight.getLatestResult();
+//        if (result != null && result.isValid()){
+//            return result.getTx();
+//        }
+//        else{
+//            return 1000;
+//        }
+//    }
 }

@@ -25,7 +25,7 @@ public class Flywheel {
 
         ElapsedTime timer = new ElapsedTime();
 
-        double targetVelocity = speed * 1600;
+        double targetVelocity = speed * 1800;
         double currentVelocity = flywheel.getVelocity();
 
         double error = targetVelocity - currentVelocity;
