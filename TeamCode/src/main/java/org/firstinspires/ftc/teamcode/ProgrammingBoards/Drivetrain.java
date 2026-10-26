@@ -11,8 +11,6 @@ public class Drivetrain {
     public DcMotorEx leftFront, leftBack, rightFront, rightBack;
 
     public Drivetrain(HardwareMap hardwareMap) {
-
-
         leftFront = hardwareMap.get(DcMotorEx.class, "leftFront");
         leftBack = hardwareMap.get(DcMotorEx.class, "leftBack");
         rightBack = hardwareMap.get(DcMotorEx.class, "rightBack");
@@ -30,7 +28,6 @@ public class Drivetrain {
         leftFront.setPower(0);
         rightBack.setPower(0);
         rightFront.setPower(0);
-
     }
     public void brakeMotors(){
         leftFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);

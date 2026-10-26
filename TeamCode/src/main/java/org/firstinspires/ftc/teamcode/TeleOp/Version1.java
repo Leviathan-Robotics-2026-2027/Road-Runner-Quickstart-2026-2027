@@ -28,9 +28,10 @@ public class Version1 extends LinearOpMode {
         intake = new Intake(hardwareMap);
         turret = new Turret(hardwareMap);
 
-        flywheel.flywheel.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        double speed = 1;
+        flywheel.flywheel.setMode(DcMotor.RunMode.RUN_USING_ENCODER); //To Make Flywheel Use PID
+        double speed = 1; //Flywheel Speed
 
+        //Flywheel PID Initialization
         PIDFCoefficients pidf = new PIDFCoefficients(30, 0, 0, 19.5);
         flywheel.flywheel.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, pidf);
 
