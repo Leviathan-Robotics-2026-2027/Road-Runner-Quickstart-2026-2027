@@ -32,7 +32,7 @@ public class Version1 extends LinearOpMode {
         double speed = 1; //Flywheel Speed
 
         //Flywheel PID Initialization
-        PIDFCoefficients pidf = new PIDFCoefficients(30, 0, 0, 19.5);
+        PIDFCoefficients pidf = new PIDFCoefficients(75, 10, 15, 48);
         flywheel.flywheel.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, pidf);
 
         waitForStart();
