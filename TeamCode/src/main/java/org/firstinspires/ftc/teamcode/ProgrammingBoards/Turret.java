@@ -28,7 +28,7 @@ public class Turret {
 
     public static double turretSpeed = -0.2;
 
-    // positive power = counterclockwise
+    //positive power = counterclockwise
     public void spinTurret(double pwr) {
         turret.setPower(pwr * turretSpeed);
     }

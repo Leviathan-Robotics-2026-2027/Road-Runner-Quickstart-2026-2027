@@ -1,10 +1,12 @@
 package org.firstinspires.ftc.teamcode.TeleOp;
 
+import com.acmerobotics.dashboard.FtcDashboard;
+import com.acmerobotics.dashboard.config.Config;
+import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
-import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.PIDFCoefficients;
+import com.qualcomm.robotcore.hardware.VoltageSensor;
 
 import org.firstinspires.ftc.teamcode.MecanumDrive;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Drivetrain;
@@ -12,8 +14,12 @@ import org.firstinspires.ftc.teamcode.ProgrammingBoards.Flywheel;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Intake;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Turret;
 
+@Config
 @TeleOp
 public class Version1 extends LinearOpMode {
+    //edit live in the dashboard config tab, flywheel pidf is under Flywheel
+    public static double targetVelocity = 1800; //shot speed in ticks per second
+
     private Flywheel flywheel;
     private Intake intake;
     private Turret turret;
@@ -22,18 +28,17 @@ public class Version1 extends LinearOpMode {
     @Override
     public void runOpMode() throws InterruptedException {
 
+        //sends telemetry to both driver station and ftc dashboard
+        telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
+
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, Math.toRadians(0)));
         drivetrain = new Drivetrain(hardwareMap);
         flywheel = new Flywheel(hardwareMap);
         intake = new Intake(hardwareMap);
         turret = new Turret(hardwareMap);
 
-        flywheel.flywheel.setMode(DcMotor.RunMode.RUN_USING_ENCODER); //To Make Flywheel Use PID
-        double speed = 1; //Flywheel Speed
-
-        //Flywheel PID Initialization
-        PIDFCoefficients pidf = new PIDFCoefficients(75, 10, 15, 48);
-        flywheel.flywheel.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, pidf);
+        VoltageSensor battery = hardwareMap.voltageSensor.iterator().next();
+        double speed = 1; //flywheel speed
 
         waitForStart();
 
@@ -50,7 +55,7 @@ public class Version1 extends LinearOpMode {
             drive.updatePoseEstimate();
             Pose2d currentPose = drive.localizer.getPose();
 
-            flywheel.flywheel.setVelocity(speed * 1800);
+            flywheel.update(speed * targetVelocity, battery.getVoltage());
 
             turret.spinTurret(gamepad2.left_stick_x);
 
@@ -59,6 +64,12 @@ public class Version1 extends LinearOpMode {
                 intake.runTransfer(1);
             } else {
                 intake.runTransfer(0);
+            }
+
+            if (gamepad1.right_bumper) {
+                intake.flowerDown();
+            } else {
+                intake.flowerUp();
             }
 
             if (gamepad2.left_bumper) {
@@ -76,6 +87,13 @@ public class Version1 extends LinearOpMode {
             }
 
             telemetry.addData("Velocity", flywheel.returnVel());
+            telemetry.addData("Target velocity", speed * targetVelocity);
+            telemetry.addData("Flywheel power", flywheel.returnPower());
+            telemetry.addData("Battery voltage", battery.getVoltage());
+            //shows what the robot is actually using, to check dashboard edits
+            telemetry.addData("kV", Flywheel.kV);
+            telemetry.addData("kP", Flywheel.kP);
+            telemetry.addData("kD", Flywheel.kD);
             telemetry.update();
         }
     }
