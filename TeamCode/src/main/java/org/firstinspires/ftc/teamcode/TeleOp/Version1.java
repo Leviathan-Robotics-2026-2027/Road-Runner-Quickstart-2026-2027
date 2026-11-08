@@ -19,15 +19,15 @@ import org.firstinspires.ftc.teamcode.ProgrammingBoards.Turret;
 @TeleOp
 public class Version1 extends LinearOpMode {
     //edit live in the dashboard config tab, flywheel pidf is under Flywheel
-    public static double targetVelocity = 1500; //close shot speed in ticks per second
+    public static double targetVelocity = 1400; //close shot speed in ticks per second
     public static double driveSpeed = 0.4; //drivetrain speed, 1 is full
 
     //flywheel speeds up the farther the robot is from the goal
     public static boolean distanceSpeed = true; //false uses targetVelocity everywhere
     public static double closeDistance = 30; //inches, at or closer than this uses targetVelocity
     public static double farDistance = 64; //inches, start pose (-60,-60) to the goal, the farthest shot
-    public static double farVelocity = 1650; //shot speed at farDistance CHANGE CHANGE CHANGE CHANGE CHANGE
-    public static double maxVelocity = 1650; //speed never goes above this
+    public static double farVelocity = 1550; //shot speed at farDistance CHANGE CHANGE CHANGE CHANGE CHANGE
+    public static double maxVelocity = 1550; //speed never goes above this
 
     private Flywheel flywheel;
     private Intake intake;
