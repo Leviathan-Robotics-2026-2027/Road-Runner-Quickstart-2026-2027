@@ -12,9 +12,9 @@ public class Flywheel {
     //edit these live in the dashboard config tab
     //kV, kP, kD are divided by 10000 in the math so they stay whole-ish numbers
     public static double kV = 5.4; //base power for a speed
-    public static double kS = 1; //percent power to overcome friction
-    public static double kP = 75; //push back against speed error
-    public static double kD = 3.5; //damps fast changes
+    public static double kS = 0.5; //percent power to overcome friction
+    public static double kP = 30; //push back against speed error
+    public static double kD = 1; //damps fast changes
     public static double nominalVoltage = 12; //voltage kV and kS are tuned for
 
     private static final double gainScale = 10000;

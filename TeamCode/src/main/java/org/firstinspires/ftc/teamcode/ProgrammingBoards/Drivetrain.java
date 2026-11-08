@@ -41,7 +41,6 @@ public class Drivetrain {
     }
 
     public void driveMotors(double speed, double turn, double strafe){
-        speed = speed * 0.85;
         leftFront.setPower(-1 * (speed - (turn + strafe)));
         leftBack.setPower(-1 * (speed - (turn - strafe)));
         rightFront.setPower(-1 * (speed + (turn + strafe)));
