@@ -14,6 +14,7 @@ public class Intake {
     //increasing position is counterclockwise
     public static double flowerUpPosition = 0.6;
     public static double flowerDownPosition = 0;
+    public static double transferSpeed = 0.85; //every transfer power gets multiplied by this
     public Intake(HardwareMap hardwareMap){
         intake = hardwareMap.get(DcMotorEx.class, "intake");
         transfer = hardwareMap.get(DcMotorEx.class, "transfer");
@@ -33,9 +34,9 @@ public class Intake {
         intake.setPower(pwr);
     }
     public void runTransfer(double pwr){
-        transfer.setPower(pwr);
+        transfer.setPower(pwr * transferSpeed);
         // positive power spins the servo counterclockwise
-        transferServo.setPower(pwr);
+        transferServo.setPower(pwr * transferSpeed);
     }
 
 }
