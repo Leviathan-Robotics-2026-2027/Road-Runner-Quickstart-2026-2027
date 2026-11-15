@@ -16,7 +16,7 @@ import org.firstinspires.ftc.teamcode.ProgrammingBoards.Flywheel;
 
 @Config
 @Autonomous
-public class AutoRedClose extends LinearOpMode {
+public class AutoRedLeft extends LinearOpMode {
     //flywheel speed from 0 to 1, 1 is fullSpeedVelocity
     public static double flywheelSpeed = 0; //0 keeps it off for now
     public static double fullSpeedVelocity = 1000; //ticks per second at speed 1
