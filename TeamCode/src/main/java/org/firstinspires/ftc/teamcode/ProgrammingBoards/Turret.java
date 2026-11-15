@@ -44,7 +44,7 @@ public class Turret {
     public static double kD = 0; //damps fast changes in error
     public static double kV = 0; //helps keep up while the robot turns or drives
     public static double kS = 0; //percent power to overcome friction
-    public static double tolerance = 1; //degrees, close enough to stop
+    public static double tolerance = 4; //degrees, close enough to stop
     public static double maxPower = 60; //percent power cap
 
     public static double turretSpeed = -0.2; //manual stick speed
@@ -56,19 +56,14 @@ public class Turret {
     public static double brakeDeadband = 3; //degrees per second, slower than this just holds
 
     //limelight mount, measure these on the robot
-    public static boolean relocalize = true; //false ignores the limelight
     public static boolean cameraOnTurret = true; //false if it is bolted to the chassis
     public static double cameraPitch = 45; //degrees tilted up from level
     public static double cameraYaw = 0; //degrees, counterclockwise from turret forward
-    public static double cameraHeight = 10; //inches, floor to lens MEASURE THIS
-    public static double cameraForward = 0; //inches ahead of the pivot
+    public static double cameraHeight = 16.5; //inches, floor to lens
+    public static double cameraForward = 4; //inches ahead of the pivot, lens is 5 in from the front of an 18 in bot
     public static double cameraLeft = 0; //inches left of the pivot
     public static int pipeline = 0;
 
-    //how much each reading moves the pose, 1 snaps right to it
-    public static double relocalizeGain = 0.03;
-    public static double maxCorrectionStep = 0.05; //inches, most one reading can move the pose
-    public static double maxCorrectionDistance = 8; //inches, readings farther than this from odometry get ignored
     public static double maxStaleness = 100; //ms, older results get ignored
     public static double maxSpinRate = 20; //degrees per second, camera spinning faster gets ignored
 
@@ -87,13 +82,13 @@ public class Turret {
     public static double tagAlongArm = 14.27; //inches along the arm from pivot to tag center
     public static double tagBelowArm = 3; //inches from the arm line down to the tag
 
-    //{tag id, x inches, side}, side is 1 for the far cell and -1 for the audience cell
-    //tags not in here are ignored
+    //{tag id, y inches, side}, side is -1 for the left cell (x < 0) and 1 for the right cell (x > 0)
+    //blue hive is centered at y = 12.75, red hive at y = -12.75, tags not in here are ignored
     private static final double[][] tagPositions = {
-            {33, -19.25, 1}, {32, -15.5, 1}, {31, -10, 1}, {30, -6.25, 1},
-            {34, -19.25, -1}, {35, -15.5, -1}, {36, -10, -1}, {37, -6.25, -1},
-            {38, 6.25, -1}, {39, 10, -1}, {40, 15.5, -1}, {41, 19.25, -1},
-            {45, 6.25, 1}, {44, 10, 1}, {43, 15.5, 1}, {42, 19.25, 1},
+            {38, 19.25, -1}, {39, 15.5, -1}, {40, 10, -1}, {41, 6.25, -1},
+            {45, 19.25, 1}, {44, 15.5, 1}, {43, 10, 1}, {42, 6.25, 1},
+            {34, -6.25, -1}, {35, -10, -1}, {36, -15.5, -1}, {37, -19.25, -1},
+            {33, -6.25, 1}, {32, -10, 1}, {31, -15.5, 1}, {30, -19.25, 1},
     };
 
     public DcMotorEx turret;
@@ -107,6 +102,7 @@ public class Turret {
     private double sweepDirection = 1;
     private boolean settling = false;
     private double lastResultTime = -1;
+    private boolean seesTag = false; //last picture had a goal tag in it
     private int sampleCount = 0;
     private double sumX, sumY, sumSin, sumCos;
 
@@ -195,30 +191,37 @@ public class Turret {
         return Math.hypot(getGoalX(pose) - pivotX, goalY - pivotY);
     }
 
-    //call every loop, returns the pose nudged toward what the april tags say
-    //heading stays from the odometry, only x and y get corrected
-    public Pose2d relocalize(Pose2d pose, PoseVelocity2d robotVel) {
-        if (!relocalize || limelight == null) {
-            return pose;
+    //returns the pose the april tags say, or null if no good tags are seen
+    //2+ tags from one cluster give x, y and heading, 1 tag gives only x and y
+    public Pose2d poseFromTags(Pose2d pose, PoseVelocity2d robotVel) {
+        if (limelight == null) {
+            return null;
         }
 
         //camera blur and lag make readings bad while spinning fast
         double turretRate = cameraOnTurret ? getRate() : 0;
         if (Math.abs(Math.toDegrees(robotVel.angVel) + turretRate) > maxSpinRate) {
-            return pose;
+            return null;
         }
 
         LLResult result = limelight.getLatestResult();
         if (result == null || !result.isValid() || result.getStaleness() > maxStaleness) {
-            return pose;
+            return null;
         }
 
-        //only use each camera reading once, odometry does the work between them
+        //only use each camera reading once
         if (result.getTimestamp() == lastResultTime) {
-            return pose;
+            return null;
         }
         lastResultTime = result.getTimestamp();
 
+        //2+ tags give the heading too, so the whole pose comes from the camera
+        double[] solved = solveStart(result);
+        if (solved != null) {
+            return new Pose2d(solved[0], solved[1], solved[2]);
+        }
+
+        //1 tag can't give the heading, keep that from odometry
         double heading = pose.heading.toDouble();
         double sumX = 0;
         double sumY = 0;
@@ -229,26 +232,17 @@ public class Turret {
                 continue;
             }
             double[] robotPosition = closestRobotPosition(pose, tagPosition, tag.getTargetXDegrees(), tag.getTargetYDegrees());
-            if (robotPosition != null
-                    && Math.hypot(robotPosition[0] - pose.position.x, robotPosition[1] - pose.position.y) <= maxCorrectionDistance) {
+            if (robotPosition != null) {
                 sumX += robotPosition[0];
                 sumY += robotPosition[1];
                 count++;
             }
         }
         if (count == 0) {
-            return pose;
+            return null;
         }
 
-        //odometry does the aiming, the limelight only gets a tiny nudge
-        double stepX = relocalizeGain * (sumX / count - pose.position.x);
-        double stepY = relocalizeGain * (sumY / count - pose.position.y);
-        double step = Math.hypot(stepX, stepY);
-        if (step > maxCorrectionStep) {
-            stepX *= maxCorrectionStep / step;
-            stepY *= maxCorrectionStep / step;
-        }
-        return new Pose2d(pose.position.x + stepX, pose.position.y + stepY, heading);
+        return new Pose2d(sumX / count, sumY / count, heading);
     }
 
     private double[] findTag(int id) {
@@ -267,8 +261,8 @@ public class Turret {
         double bestDistance = Double.MAX_VALUE;
         for (int tip = -1; tip <= 1; tip += 2) {
             //tip 1 is the raised cell, -1 is the lowered cell
-            double tagY = tagPosition[2] * tagDistanceFromCenter(tip);
-            double[] candidate = robotFromTag(tagPosition[1], tagY, tagHeight(tip), tx, ty, heading);
+            double tagX = tagPosition[2] * tagDistanceFromCenter(tip);
+            double[] candidate = robotFromTag(tagX, tagPosition[1], tagHeight(tip), tx, ty, heading);
             if (candidate != null) {
                 double distance = Math.hypot(candidate[0] - pose.position.x, candidate[1] - pose.position.y);
                 if (distance < bestDistance) {
@@ -461,7 +455,7 @@ public class Turret {
             if (ray == null) {
                 return null;
             }
-            points.add(new double[] {tagPosition[1], tagPosition[2] * tagDistanceFromCenter(tip), ray[0], ray[1]});
+            points.add(new double[] {tagPosition[2] * tagDistanceFromCenter(tip), tagPosition[1], ray[0], ray[1]});
         }
 
         double[] mean = new double[4];
@@ -540,6 +534,49 @@ public class Turret {
         double goalAngleRate = (dy * fieldVelX - dx * fieldVelY) / distSq;
         double turretRate = Math.toDegrees(goalAngleRate - robotVel.angVel);
 
+        moveToTarget(currentAngle, turretRate);
+    }
+
+    //call every loop, turns the turret straight at the april tags the camera sees
+    //returns false when it can't see any goal tags
+    public boolean aimAtTag() {
+        if (limelight == null) {
+            return false;
+        }
+        LLResult result = limelight.getLatestResult();
+        if (result == null || !result.isValid() || result.getStaleness() > maxStaleness) {
+            return false;
+        }
+
+        double currentAngle = getAngle();
+        //only pick a new target on a new picture, the old picture is from before the turret moved
+        if (result.getTimestamp() != lastResultTime) {
+            lastResultTime = result.getTimestamp();
+            double sumTx = 0;
+            int count = 0;
+            for (LLResultTypes.FiducialResult tag : result.getFiducialResults()) {
+                if (findTag(tag.getFiducialId()) != null) {
+                    sumTx += tag.getTargetXDegrees();
+                    count++;
+                }
+            }
+            seesTag = count > 0;
+            if (!seesTag) {
+                return false;
+            }
+            //tx is positive when the tags are right of center, the turret is positive counterclockwise
+            targetAngle = pickReachableAngle(currentAngle + cameraYaw - sumTx / count + aimOffset, currentAngle);
+        }
+
+        if (!seesTag) {
+            return false;
+        }
+        moveToTarget(currentAngle, 0);
+        return true;
+    }
+
+    //pd toward targetAngle, turretRate is how fast the target is moving in degrees per second
+    private void moveToTarget(double currentAngle, double turretRate) {
         double dt = timer.seconds();
         timer.reset();
         double error = targetAngle - currentAngle;
