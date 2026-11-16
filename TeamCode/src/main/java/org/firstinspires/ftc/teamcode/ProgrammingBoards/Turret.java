@@ -44,7 +44,7 @@ public class Turret {
     public static double kD = 0; //damps fast changes in error
     public static double kV = 0; //helps keep up while the robot turns or drives
     public static double kS = 0; //percent power to overcome friction
-    public static double tolerance = 4; //degrees, close enough to stop
+    public static double tolerance = 3; //degrees, close enough to stop
     public static double maxPower = 60; //percent power cap
 
     public static double turretSpeed = -0.2; //manual stick speed
@@ -66,6 +66,7 @@ public class Turret {
 
     public static double maxStaleness = 100; //ms, older results get ignored
     public static double maxSpinRate = 20; //degrees per second, camera spinning faster gets ignored
+    public static double tagSmoothing = 0.5; //0 to 1, how much each new picture moves the tag aim, 1 jumps right to it
 
     //startup sweep that finds the start location from the tags
     public static boolean findStart = false; //false skips the sweep and uses the fixed start
@@ -103,6 +104,13 @@ public class Turret {
     private boolean settling = false;
     private double lastResultTime = -1;
     private boolean seesTag = false; //last picture had a goal tag in it
+    private final ElapsedTime tagAimTimer = new ElapsedTime(); //time since aimAtTag last ran
+    private static final double hiveCenterY = 12.75; //inches, each hive's tags are centered on this y
+    //recent turret angles, so a late camera picture can be matched to where the turret was when it was taken
+    private static final int historySize = 128;
+    private final double[] historyTimes = new double[historySize]; //ms
+    private final double[] historyAngles = new double[historySize];
+    private int historyCount = 0;
     private int sampleCount = 0;
     private double sumX, sumY, sumSin, sumCos;
 
@@ -156,7 +164,37 @@ public class Turret {
     //turret angle in degrees from robot forward, counterclockwise is positive
     public double getAngle() {
         double degrees = turret.getCurrentPosition() * 360.0 / ticksPerRev;
-        return encoderReversed ? -degrees : degrees;
+        if (encoderReversed) {
+            degrees = -degrees;
+        }
+        int i = historyCount % historySize;
+        historyTimes[i] = System.currentTimeMillis();
+        historyAngles[i] = degrees;
+        historyCount++;
+        return degrees;
+    }
+
+    //turret angle at an earlier time in ms, from the saved history
+    private double angleAt(double timeMs) {
+        int saved = Math.min(historyCount, historySize);
+        double newerTime = 0;
+        double newerAngle = 0;
+        for (int k = 1; k <= saved; k++) {
+            int i = ((historyCount - k) % historySize + historySize) % historySize;
+            if (historyTimes[i] <= timeMs) {
+                if (k == 1) {
+                    return historyAngles[i];
+                }
+                //blend between the two saved angles around that time
+                double span = newerTime - historyTimes[i];
+                double t = span > 0 ? (timeMs - historyTimes[i]) / span : 0;
+                return historyAngles[i] + t * (newerAngle - historyAngles[i]);
+            }
+            newerTime = historyTimes[i];
+            newerAngle = historyAngles[i];
+        }
+        //older than the history, use the oldest saved angle
+        return newerAngle;
     }
 
     //positive direction = counterclockwise
@@ -537,35 +575,70 @@ public class Turret {
         moveToTarget(currentAngle, turretRate);
     }
 
-    //call every loop, turns the turret straight at the april tags the camera sees
-    //returns false when it can't see any goal tags
-    public boolean aimAtTag() {
+    //call every loop, turns the turret straight at the goal cell's april tags
+    //returns false when it can't see any tags on that cell
+    public boolean aimAtTag(Pose2d pose) {
         if (limelight == null) {
             return false;
         }
+        double currentAngle = getAngle();
+        boolean justStarted = tagAimTimer.seconds() > 0.2;
+        tagAimTimer.reset();
+
         LLResult result = limelight.getLatestResult();
         if (result == null || !result.isValid() || result.getStaleness() > maxStaleness) {
             return false;
         }
 
-        double currentAngle = getAngle();
-        //only pick a new target on a new picture, the old picture is from before the turret moved
-        if (result.getTimestamp() != lastResultTime) {
+        //only pick a new target on a new picture
+        if (result.getTimestamp() != lastResultTime || justStarted) {
             lastResultTime = result.getTimestamp();
-            double sumTx = 0;
-            int count = 0;
+
+            //only use the cell we're shooting at, so tags on the other cell don't pull the aim
+            int side = pose.position.x > sideLineX ? 1 : -1;
+            double centerY = Math.signum(goalY) * hiveCenterY;
+            int n = 0;
+            double sumOffset = 0, sumTx = 0, sumOffsetSq = 0, sumOffsetTx = 0;
             for (LLResultTypes.FiducialResult tag : result.getFiducialResults()) {
-                if (findTag(tag.getFiducialId()) != null) {
-                    sumTx += tag.getTargetXDegrees();
-                    count++;
+                double[] tagPosition = findTag(tag.getFiducialId());
+                if (tagPosition == null || (int) tagPosition[2] != side
+                        || Math.signum(tagPosition[1]) != Math.signum(goalY)) {
+                    continue;
                 }
+                double offset = tagPosition[1] - centerY;
+                double tx = tag.getTargetXDegrees();
+                n++;
+                sumOffset += offset;
+                sumTx += tx;
+                sumOffsetSq += offset * offset;
+                sumOffsetTx += offset * tx;
             }
-            seesTag = count > 0;
+            seesTag = n > 0;
             if (!seesTag) {
                 return false;
             }
+
+            //line through the tags gives the cell center even when only some tags are in view
+            double centerTx = sumTx / n;
+            double denominator = n * sumOffsetSq - sumOffset * sumOffset;
+            if (n >= 2 && Math.abs(denominator) > 1e-6) {
+                double slope = (n * sumOffsetTx - sumOffset * sumTx) / denominator;
+                centerTx = (sumTx - slope * sumOffset) / n;
+            }
+
+            //the picture is a little old, so use where the turret was when it was taken
+            double captureTime = result.getControlHubTimeStamp() - result.getCaptureLatency()
+                    - result.getTargetingLatency() - result.getParseLatency();
+            double angleThen = angleAt(captureTime);
+
             //tx is positive when the tags are right of center, the turret is positive counterclockwise
-            targetAngle = pickReachableAngle(currentAngle + cameraYaw - sumTx / count + aimOffset, currentAngle);
+            double newTarget = angleThen + cameraYaw - centerTx + aimOffset;
+            if (justStarted) {
+                targetAngle = newTarget;
+            } else {
+                targetAngle += tagSmoothing * (newTarget - targetAngle);
+            }
+            targetAngle = pickReachableAngle(targetAngle, currentAngle);
         }
 
         if (!seesTag) {

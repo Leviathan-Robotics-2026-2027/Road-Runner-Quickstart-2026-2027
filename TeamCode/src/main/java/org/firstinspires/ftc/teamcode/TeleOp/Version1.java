@@ -20,12 +20,12 @@ import org.firstinspires.ftc.teamcode.ProgrammingBoards.Turret;
 @TeleOp
 public class Version1 extends LinearOpMode {
     //edit live in the dashboard config tab, flywheel pidf is under Flywheel
-    public static double targetVelocity = 750; //close shot speed in ticks per second
+    public static double targetVelocity = 725; //close shot speed in ticks per second
     public static double driveSpeed = 0.8; //drivetrain speed, 1 is full
 
     //flywheel speeds up the farther the robot is from the goal
     public static boolean distanceSpeed = true; //false uses targetVelocity everywhere
-    public static double closeDistance = 36; //inches, at or closer than this uses targetVelocity
+    public static double closeDistance = 32; //inches, at or closer than this uses targetVelocity
     public static double farDistance = 72; //inches of the farthest shot distance
     public static double farVelocity = 800; //shot speed at farDistance
     public static double maxVelocity = 800; //speed never goes above this
@@ -68,6 +68,7 @@ public class Version1 extends LinearOpMode {
             if (gamepad1.square && !lastSquare) {
                 currentPose = new Pose2d(-60, -60, currentPose.heading.toDouble());
                 drive.localizer.setPose(currentPose);
+                gamepad1.rumble(300); //tells the driver the reset happened
             }
             lastSquare = gamepad1.square;
 
@@ -116,7 +117,7 @@ public class Version1 extends LinearOpMode {
                 }
             } else if (Math.abs(manualTurret) > 0.1) {
                 turret.spinTurret(manualTurret);
-            } else if (gamepad1.triangle && turret.aimAtTag()) {
+            } else if (gamepad1.triangle && turret.aimAtTag(currentPose)) {
                 //holding triangle points the turret straight at the april tags
             } else {
                 turret.aimAtGoal(currentPose, robotVel);
@@ -149,7 +150,6 @@ public class Version1 extends LinearOpMode {
 
             telemetry.addData("Velocity", flywheel.returnVel());
             telemetry.addData("targetVelocity", speed * shotVelocity);
-            telemetry.addData("Ramp position", ramp.ramp.getPosition()); //temporary, checks the cross button
             telemetry.update();
         }
     }

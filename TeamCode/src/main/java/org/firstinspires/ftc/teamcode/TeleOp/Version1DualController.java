@@ -53,10 +53,12 @@ public class Version1DualController extends LinearOpMode {
             PoseVelocity2d robotVel = drive.updatePoseEstimate();
             Pose2d currentPose = drive.localizer.getPose();
 
-            //square resets the location to the start, heading stays from odometry
+            //square resets the location to the corner on the side the robot is on, heading stays from odometry
             if (gamepad2.square && !lastSquare) {
-                currentPose = new Pose2d(-60, -60, currentPose.heading.toDouble());
+                double cornerX = currentPose.position.x > Turret.sideLineX ? 60 : -60;
+                currentPose = new Pose2d(cornerX, -60, currentPose.heading.toDouble());
                 drive.localizer.setPose(currentPose);
+                gamepad1.rumble(300); //tells the driver the reset happened
             }
             lastSquare = gamepad2.square;
 
@@ -107,7 +109,7 @@ public class Version1DualController extends LinearOpMode {
                 }
             } else if (Math.abs(manualTurret) > 0.1) {
                 turret.spinTurret(manualTurret);
-            } else if (gamepad2.triangle && turret.aimAtTag()) {
+            } else if (gamepad2.triangle && turret.aimAtTag(currentPose)) {
                 //holding triangle points the turret straight at the april tags
             } else {
                 turret.aimAtGoal(currentPose, robotVel);
@@ -125,6 +127,7 @@ public class Version1DualController extends LinearOpMode {
             } else {
                 intake.runIntake(0);
             }
+
 
             //circle runs the intake and transfer backwards
             if (gamepad2.circle) {

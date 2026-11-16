@@ -11,9 +11,9 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 public class Flywheel {
     //edit these live in the dashboard config tab
     //kV, kP, kD are divided by 10000 in the math so they stay whole-ish numbers
-    public static double kV = 10.75; //base power for a speed
+    public static double kV = 10; //base power for a speed
     public static double kS = 0; //percent power to overcome friction
-    public static double kP = 50; //push back against speed error
+    public static double kP = 56; //push back against speed error
     public static double kD = 0.25; //damps fast changes
     public static double nominalVoltage = 12; //voltage kV and kS are tuned for
 
