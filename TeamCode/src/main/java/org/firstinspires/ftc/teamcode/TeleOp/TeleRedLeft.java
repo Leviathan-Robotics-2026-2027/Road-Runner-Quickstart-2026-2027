@@ -1,7 +1,6 @@
 package org.firstinspires.ftc.teamcode.TeleOp;
 
 import com.acmerobotics.dashboard.FtcDashboard;
-import com.acmerobotics.dashboard.config.Config;
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
@@ -17,20 +16,10 @@ import org.firstinspires.ftc.teamcode.ProgrammingBoards.Ramp;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Turret;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Transfer;
 
-@Config
-@TeleOp
-public class Version1 extends LinearOpMode {
-    //edit live in the dashboard config tab, flywheel pidf is under Flywheel
-    public static double targetVelocity = 780; //close shot speed in ticks per second
-    public static double driveSpeed = 0.8; //drivetrain speed, 1 is full
-
-    //flywheel speeds up the farther the robot is from the goal
-    public static boolean distanceSpeed = true; //false uses targetVelocity everywhere
-    public static double closeDistance = 32; //inches, at or closer than this uses targetVelocity
-    public static double farDistance = 72; //inches of the farthest shot distance
-    public static double farVelocity = 860; //shot speed at farDistance
-    public static double maxVelocity = 860; //speed never goes above this
-
+//same as version 1, gamepad 1 drives and runs the ramp, gamepad 2 does everything else
+//uses the version 1 settings in the dashboard
+@TeleOp(name = "TeleRedLeft_SingleController-(DualController)")
+public class TeleRedLeft extends LinearOpMode {
     private Flywheel flywheel;
     private Intake intake;
     private Transfer transfer;
@@ -55,7 +44,7 @@ public class Version1 extends LinearOpMode {
         VoltageSensor battery = hardwareMap.voltageSensor.iterator().next();
         double speed = 1; //flywheel speed
         turret.resetAngle(); //turret must face robot forward at init
-        boolean lastCross = false;
+        boolean lastRampButton = false;
         boolean lastDpadLeft = false;
         boolean lastDpadRight = false;
         boolean lastSquare = false;
@@ -67,17 +56,20 @@ public class Version1 extends LinearOpMode {
             PoseVelocity2d robotVel = drive.updatePoseEstimate();
             Pose2d currentPose = drive.localizer.getPose();
 
-            //square resets the location to the start, heading stays from odometry
-            if (gamepad1.square && !lastSquare) {
-                currentPose = new Pose2d(-60, -60, currentPose.heading.toDouble());
+            //square resets the location to the corner on the side the robot is on, heading stays from odometry
+            if (gamepad2.square && !lastSquare) {
+                double cornerX = currentPose.position.x > Turret.sideLineX ? 60 : -60;
+                currentPose = new Pose2d(cornerX, -60, currentPose.heading.toDouble());
                 drive.localizer.setPose(currentPose);
                 gamepad1.rumble(300); //tells the driver the reset happened
             }
-            lastSquare = gamepad1.square;
+            lastSquare = gamepad2.square;
 
+            //gamepad 1 drives
             boolean sticksReleased = Math.abs(gamepad1.left_stick_y) < 0.05
                     && Math.abs(gamepad1.left_stick_x) < 0.05
                     && Math.abs(gamepad1.right_stick_x) < 0.05;
+            double driveSpeed = TeleRedLeft_SingleController.driveSpeed;
             if (sticksReleased) {
                 drivetrain.brakeMotors();
             } else {
@@ -85,27 +77,27 @@ public class Version1 extends LinearOpMode {
             }
             double distanceToGoal = Turret.getDistanceToGoal(currentPose);
             //no distance speed during the sweep, the location isn't known yet
-            double shotVelocity = distanceSpeed && !findingStart ? velocityForDistance(distanceToGoal) : targetVelocity;
+            double shotVelocity = TeleRedLeft_SingleController.distanceSpeed && !findingStart ? TeleRedLeft_SingleController.velocityForDistance(distanceToGoal) : TeleRedLeft_SingleController.targetVelocity;
             flywheel.update(speed * shotVelocity, battery.getVoltage());
 
-            //cross toggles the ramp up and down
-            if (gamepad1.cross && !lastCross) {
+            //gamepad 1 right bumper toggles the ramp up and down
+            if (gamepad1.right_bumper && !lastRampButton) {
                 ramp.toggle();
             }
-            lastCross = gamepad1.cross;
+            lastRampButton = gamepad1.right_bumper;
 
             //right trigger is like the old stick pushed right, left trigger like pushed left
-            double manualTurret = gamepad1.right_trigger - gamepad1.left_trigger;
+            double manualTurret = gamepad2.right_trigger - gamepad2.left_trigger;
 
             //dpad nudges the auto aim left or right, one step per press
-            if (gamepad1.dpad_left && !lastDpadLeft) {
+            if (gamepad2.dpad_left && !lastDpadLeft) {
                 turret.adjustAim(1);
             }
-            if (gamepad1.dpad_right && !lastDpadRight) {
+            if (gamepad2.dpad_right && !lastDpadRight) {
                 turret.adjustAim(-1);
             }
-            lastDpadLeft = gamepad1.dpad_left;
-            lastDpadRight = gamepad1.dpad_right;
+            lastDpadLeft = gamepad2.dpad_left;
+            lastDpadRight = gamepad2.dpad_right;
 
             //any stick or trigger cancels the startup sweep
             if (findingStart && (!sticksReleased || Math.abs(manualTurret) > 0.1)) {
@@ -120,33 +112,20 @@ public class Version1 extends LinearOpMode {
                 }
             } else if (Math.abs(manualTurret) > 0.1) {
                 turret.spinTurret(manualTurret);
-            } else if (gamepad1.triangle && turret.aimAtTag(currentPose)) {
+            } else if (gamepad2.triangle && turret.aimAtTag(currentPose)) {
                 //holding triangle points the turret straight at the april tags
             } else {
                 turret.aimAtGoal(currentPose, robotVel);
             }
 
-            //Manual control for intake and transfer
-            if (gamepad1.right_bumper) {
-                transfer.run(1);
-            } else {
-                transfer.run(0);
-            }
+            //gamepad 2 runs the intake and transfer
+            transfer.run(gamepad2.right_bumper ? 1 : 0);
 
-//            if (gamepad1.right_bumper) {
-//                intake.flowerDown();
-//            } else {
-//                intake.flowerUp();
-//            }
+            intake.runIntake(gamepad2.left_bumper ? 1 : 0);
 
-            if (gamepad1.left_bumper) {
-                intake.runIntake(1);
-            } else {
-                intake.runIntake(0);
-            }
 
             //circle runs the intake and transfer backwards
-            if (gamepad1.circle) {
+            if (gamepad2.circle) {
                 intake.runIntake(-1);
                 transfer.run(-1);
             }
@@ -155,12 +134,5 @@ public class Version1 extends LinearOpMode {
             telemetry.addData("targetVelocity", speed * shotVelocity);
             telemetry.update();
         }
-    }
-
-    //straight line through the close and far speeds, kept between the close speed and maxVelocity
-    static double velocityForDistance(double distance) {
-        double slope = (farVelocity - targetVelocity) / (farDistance - closeDistance);
-        double velocity = targetVelocity + slope * (distance - closeDistance);
-        return Math.max(targetVelocity, Math.min(maxVelocity, velocity));
     }
 }
