@@ -11,11 +11,12 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 public class Flywheel {
     //edit these live in the dashboard config tab
     //kV, kP, kD are divided by 10000 in the math so they stay whole-ish numbers
-    public static double kV = 10; //base power for a speed
+    public static double kV = 9.05; //base power for a speed
     public static double kS = 0; //percent power to overcome friction
-    public static double kP = 56; //push back against speed error
+    public static double kP = 57.5; //push back against speed error
     public static double kD = 0.25; //damps fast changes
     public static double nominalVoltage = 12; //voltage kV and kS are tuned for
+    public static boolean batteryScaling = true; //true scales the feedforward to the battery voltage
 
     private static final double gainScale = 10000;
 
@@ -53,8 +54,11 @@ public class Flywheel {
         double derivative = dt > 0 ? (error - lastError) / dt : 0;
         lastError = error;
 
-        //feedforward is scaled to the battery so the same speed needs the same numbers on any charge
-        double feedforward = (kV / gainScale * targetVelocity + kS / 100) * nominalVoltage / batteryVoltage;
+        double feedforward = kV / gainScale * targetVelocity + kS / 100;
+        if (batteryScaling) {
+            //same speed needs the same numbers on any charge
+            feedforward *= nominalVoltage / batteryVoltage;
+        }
         double feedback = (kP * error + kD * derivative) / gainScale;
 
         //never drive backwards, just coast down if too fast

@@ -1,6 +1,5 @@
 package org.firstinspires.ftc.teamcode.ProgrammingBoards;
 
-import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
@@ -8,19 +7,13 @@ import com.qualcomm.robotcore.hardware.Servo;
 
 public class Intake {
     public DcMotorEx intake;
-    public DcMotorEx transfer;
-    public CRServo transferServo;
     public Servo flowerIntake;
     //increasing position is counterclockwise
     public static double flowerUpPosition = 0.6;
     public static double flowerDownPosition = 0;
-    public static double transferSpeed = 0.8; //every transfer power gets multiplied by this
     public Intake(HardwareMap hardwareMap){
         intake = hardwareMap.get(DcMotorEx.class, "intake");
-        transfer = hardwareMap.get(DcMotorEx.class, "transfer");
         intake.setDirection(DcMotorSimple.Direction.REVERSE);
-        transfer.setDirection(DcMotorSimple.Direction.REVERSE);
-        transferServo = hardwareMap.get(CRServo.class, "transferServo");
         flowerIntake = hardwareMap.get(Servo.class, "flowerIntake");
         flowerIntake.setPosition(flowerUpPosition);
     }
@@ -32,11 +25,6 @@ public class Intake {
     }
     public void runIntake(double pwr){
         intake.setPower(pwr);
-    }
-    public void runTransfer(double pwr){
-        transfer.setPower(pwr * transferSpeed);
-        // positive power spins the servo counterclockwise
-        transferServo.setPower(pwr * transferSpeed);
     }
 
 }

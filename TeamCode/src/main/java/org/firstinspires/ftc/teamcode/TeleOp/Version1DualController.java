@@ -14,6 +14,7 @@ import org.firstinspires.ftc.teamcode.ProgrammingBoards.Flywheel;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Intake;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Ramp;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Turret;
+import org.firstinspires.ftc.teamcode.ProgrammingBoards.Transfer;
 
 //same as version 1, gamepad 1 drives and runs the ramp, gamepad 2 does everything else
 //uses the version 1 settings in the dashboard
@@ -21,6 +22,7 @@ import org.firstinspires.ftc.teamcode.ProgrammingBoards.Turret;
 public class Version1DualController extends LinearOpMode {
     private Flywheel flywheel;
     private Intake intake;
+    private Transfer transfer;
     private Turret turret;
     private Drivetrain drivetrain;
     private Ramp ramp;
@@ -35,6 +37,7 @@ public class Version1DualController extends LinearOpMode {
         drivetrain = new Drivetrain(hardwareMap);
         flywheel = new Flywheel(hardwareMap);
         intake = new Intake(hardwareMap);
+        transfer = new Transfer(hardwareMap);
         turret = new Turret(hardwareMap);
         ramp = new Ramp(hardwareMap); //starts straight up
 
@@ -117,9 +120,9 @@ public class Version1DualController extends LinearOpMode {
 
             //gamepad 2 runs the intake and transfer
             if (gamepad2.right_bumper) {
-                intake.runTransfer(1);
+                transfer.run(1);
             } else {
-                intake.runTransfer(0);
+                transfer.run(0);
             }
 
             if (gamepad2.left_bumper) {
@@ -132,7 +135,7 @@ public class Version1DualController extends LinearOpMode {
             //circle runs the intake and transfer backwards
             if (gamepad2.circle) {
                 intake.runIntake(-1);
-                intake.runTransfer(-1);
+                transfer.run(-1);
             }
 
             telemetry.addData("Velocity", flywheel.returnVel());

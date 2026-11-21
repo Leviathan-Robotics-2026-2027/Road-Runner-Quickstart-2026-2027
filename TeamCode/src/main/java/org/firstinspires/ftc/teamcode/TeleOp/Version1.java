@@ -15,23 +15,25 @@ import org.firstinspires.ftc.teamcode.ProgrammingBoards.Flywheel;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Intake;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Ramp;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Turret;
+import org.firstinspires.ftc.teamcode.ProgrammingBoards.Transfer;
 
 @Config
 @TeleOp
 public class Version1 extends LinearOpMode {
     //edit live in the dashboard config tab, flywheel pidf is under Flywheel
-    public static double targetVelocity = 725; //close shot speed in ticks per second
+    public static double targetVelocity = 780; //close shot speed in ticks per second
     public static double driveSpeed = 0.8; //drivetrain speed, 1 is full
 
     //flywheel speeds up the farther the robot is from the goal
     public static boolean distanceSpeed = true; //false uses targetVelocity everywhere
     public static double closeDistance = 32; //inches, at or closer than this uses targetVelocity
     public static double farDistance = 72; //inches of the farthest shot distance
-    public static double farVelocity = 800; //shot speed at farDistance
-    public static double maxVelocity = 800; //speed never goes above this
+    public static double farVelocity = 860; //shot speed at farDistance
+    public static double maxVelocity = 860; //speed never goes above this
 
     private Flywheel flywheel;
     private Intake intake;
+    private Transfer transfer;
     private Turret turret;
     private Drivetrain drivetrain;
     private Ramp ramp;
@@ -46,6 +48,7 @@ public class Version1 extends LinearOpMode {
         drivetrain = new Drivetrain(hardwareMap);
         flywheel = new Flywheel(hardwareMap);
         intake = new Intake(hardwareMap);
+        transfer = new Transfer(hardwareMap);
         turret = new Turret(hardwareMap);
         ramp = new Ramp(hardwareMap); //starts straight up
 
@@ -125,9 +128,9 @@ public class Version1 extends LinearOpMode {
 
             //Manual control for intake and transfer
             if (gamepad1.right_bumper) {
-                intake.runTransfer(1);
+                transfer.run(1);
             } else {
-                intake.runTransfer(0);
+                transfer.run(0);
             }
 
 //            if (gamepad1.right_bumper) {
@@ -145,7 +148,7 @@ public class Version1 extends LinearOpMode {
             //circle runs the intake and transfer backwards
             if (gamepad1.circle) {
                 intake.runIntake(-1);
-                intake.runTransfer(-1);
+                transfer.run(-1);
             }
 
             telemetry.addData("Velocity", flywheel.returnVel());
