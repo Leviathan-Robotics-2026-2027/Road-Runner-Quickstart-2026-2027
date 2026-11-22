@@ -18,7 +18,7 @@ import org.firstinspires.ftc.teamcode.ProgrammingBoards.Turret;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Transfer;
 
 @Config
-@TeleOp
+@TeleOp(name = "TeleRedLeft_SingleController")
 public class TeleRedLeft_SingleController extends LinearOpMode {
     //edit live in the dashboard config tab, flywheel pidf is under Flywheel
     public static double targetVelocity = 780; //close shot speed in ticks per second

@@ -18,7 +18,7 @@ import org.firstinspires.ftc.teamcode.ProgrammingBoards.Transfer;
 
 //same as version 1, gamepad 1 drives and runs the ramp, gamepad 2 does everything else
 //uses the version 1 settings in the dashboard
-@TeleOp(name = "TeleRedLeft_SingleController-(DualController)")
+@TeleOp(name = "TeleRedLeft")
 public class TeleRedLeft extends LinearOpMode {
     private Flywheel flywheel;
     private Intake intake;

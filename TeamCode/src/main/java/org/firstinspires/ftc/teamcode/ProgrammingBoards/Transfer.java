@@ -8,7 +8,7 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 
 @Config
 public class Transfer {
-    public static double transferSpeed = 1; //every transfer power gets multiplied by this
+    public static double transferSpeed = 0.65; //every transfer power gets multiplied by this
 
     public DcMotorEx transfer;
     public CRServo transferServo;

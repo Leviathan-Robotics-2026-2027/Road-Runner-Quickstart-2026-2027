@@ -6,6 +6,7 @@ import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
+import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Flywheel;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Intake;
@@ -18,7 +19,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 @TeleOp(name = "FlywheelTest")
 public class FlywheelTest extends LinearOpMode {
     //edit live in the dashboard config tab, flywheel pidf is under Flywheel
-    public static double testVelocity = 780; //ticks per second
+    public static double testVelocity = 760; //ticks per second
     public static double velocityStep = 20; //dpad up and down change speed by this
     public static double maxTestVelocity = 1500; //speed never goes above this
 
@@ -35,6 +36,9 @@ public class FlywheelTest extends LinearOpMode {
 
         boolean lastDpadUp = false;
         boolean lastDpadDown = false;
+        boolean lastSquare = false;
+        ElapsedTime outtakeTimer = new ElapsedTime();
+        boolean outtaking = false;
 
         ElapsedTime loopTimer = new ElapsedTime(); //loop timer
 
@@ -61,13 +65,26 @@ public class FlywheelTest extends LinearOpMode {
             transfer.run(gamepad1.right_bumper ? 1 : 0);
             intake.runIntake(gamepad1.left_bumper ? 1 : 0);
 
-            telemetry.addData("velocity", flywheel.returnVel());
+            //square outtakes the intake for 0.2 seconds, same if tapped or held
+            if (gamepad1.square && !lastSquare) {
+                outtaking = true;
+                outtakeTimer.reset();
+            }
+            lastSquare = gamepad1.square;
+            if (outtaking && outtakeTimer.seconds() < 0.08) {
+                intake.runIntake(-1);
+            } else {
+                outtaking = false;
+            }
+
             telemetry.addData("targetVelocity", testVelocity);
+            telemetry.addData("velocity", flywheel.returnVel());
             telemetry.addData("percentError", percentError);
             telemetry.addData("error", error);
             telemetry.addData("Flywheel power", flywheel.returnPower());
             telemetry.addData("Battery voltage", battery.getVoltage());
             telemetry.addData("loopMs", loopTimer.milliseconds());
+            telemetry.addData("shooting", gamepad1.right_bumper ? 1 : 0);
             loopTimer.reset();
             telemetry.update();
         }
