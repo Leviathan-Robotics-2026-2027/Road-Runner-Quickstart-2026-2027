@@ -13,7 +13,6 @@ import org.firstinspires.ftc.teamcode.MecanumDrive;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Drivetrain;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Flywheel;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Intake;
-import org.firstinspires.ftc.teamcode.ProgrammingBoards.Ramp;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Turret;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Transfer;
 
@@ -21,22 +20,21 @@ import org.firstinspires.ftc.teamcode.ProgrammingBoards.Transfer;
 @TeleOp(name = "TeleRedLeft_SingleController")
 public class TeleRedLeft_SingleController extends LinearOpMode {
     //edit live in the dashboard config tab, flywheel pidf is under Flywheel
-    public static double targetVelocity = 780; //close shot speed in ticks per second
-    public static double driveSpeed = 0.8; //drivetrain speed, 1 is full
+    public static double targetVelocity = 740; //close shot speed in ticks per second
+    public static double driveSpeed = 0.7; //drivetrain speed, 1 is full
 
     //flywheel speeds up the farther the robot is from the goal
-    public static boolean distanceSpeed = true; //false uses targetVelocity everywhere
+    public static boolean distanceSpeed = false; //false uses targetVelocity everywhere
     public static double closeDistance = 32; //inches, at or closer than this uses targetVelocity
-    public static double farDistance = 72; //inches of the farthest shot distance
-    public static double farVelocity = 860; //shot speed at farDistance
-    public static double maxVelocity = 860; //speed never goes above this
+    public static double farDistance = 48; //inches of the farthest shot distance
+    public static double farVelocity = 760; //shot speed at farDistance
+    public static double maxVelocity = 760; //speed never goes above this
 
     private Flywheel flywheel;
     private Intake intake;
     private Transfer transfer;
     private Turret turret;
     private Drivetrain drivetrain;
-    private Ramp ramp;
 
     @Override
     public void runOpMode() throws InterruptedException {
@@ -47,10 +45,9 @@ public class TeleRedLeft_SingleController extends LinearOpMode {
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(-60, -60, Math.toRadians(0)));
         drivetrain = new Drivetrain(hardwareMap);
         flywheel = new Flywheel(hardwareMap);
-        intake = new Intake(hardwareMap);
+        intake = new Intake(hardwareMap); //ramp starts straight up
         transfer = new Transfer(hardwareMap);
         turret = new Turret(hardwareMap);
-        ramp = new Ramp(hardwareMap); //starts straight up
 
         VoltageSensor battery = hardwareMap.voltageSensor.iterator().next();
         double speed = 1; //flywheel speed
@@ -90,7 +87,7 @@ public class TeleRedLeft_SingleController extends LinearOpMode {
 
             //cross toggles the ramp up and down
             if (gamepad1.cross && !lastCross) {
-                ramp.toggle();
+                intake.toggleRamp();
             }
             lastCross = gamepad1.cross;
 
@@ -127,12 +124,13 @@ public class TeleRedLeft_SingleController extends LinearOpMode {
             }
 
             //Manual control for intake and transfer
-            transfer.run(gamepad1.right_bumper ? 1 : 0);
+            //only feeds while the flywheel is up to speed, see Transfer speedGate
+            boolean feeding = transfer.feed(gamepad1.right_bumper, flywheel.returnVel(), speed * shotVelocity);
 
 //            if (gamepad1.right_bumper) {
-//                intake.flowerDown();
+//                intake.rampDown();
 //            } else {
-//                intake.flowerUp();
+//                intake.rampUp();
 //            }
 
             intake.runIntake(gamepad1.left_bumper ? 1 : 0);
@@ -143,8 +141,9 @@ public class TeleRedLeft_SingleController extends LinearOpMode {
                 transfer.run(-1);
             }
 
-            telemetry.addData("Velocity", flywheel.returnVel());
+            telemetry.addData("velocity", flywheel.returnVel());
             telemetry.addData("targetVelocity", speed * shotVelocity);
+            telemetry.addData("feeding", feeding ? 1 : 0);
             telemetry.update();
         }
     }

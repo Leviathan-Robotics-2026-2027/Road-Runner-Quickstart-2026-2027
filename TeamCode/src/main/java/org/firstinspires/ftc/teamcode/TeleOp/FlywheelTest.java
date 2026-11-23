@@ -19,9 +19,9 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 @TeleOp(name = "FlywheelTest")
 public class FlywheelTest extends LinearOpMode {
     //edit live in the dashboard config tab, flywheel pidf is under Flywheel
-    public static double testVelocity = 760; //ticks per second
+    public static double testVelocity = 750; //ticks per second
     public static double velocityStep = 20; //dpad up and down change speed by this
-    public static double maxTestVelocity = 1500; //speed never goes above this
+    public static double maxTestVelocity = 1000; //speed never goes above this
 
     @Override
     public void runOpMode() throws InterruptedException {
@@ -62,7 +62,7 @@ public class FlywheelTest extends LinearOpMode {
             flywheel.update(testVelocity, battery.getVoltage());
 
             //right bumper runs transfer, left bumper runs intake
-            transfer.run(gamepad1.right_bumper ? 1 : 0);
+            boolean feeding = transfer.feed(gamepad1.right_bumper, flywheel.returnVel(), testVelocity);
             intake.runIntake(gamepad1.left_bumper ? 1 : 0);
 
             //square outtakes the intake for 0.2 seconds, same if tapped or held
@@ -85,6 +85,7 @@ public class FlywheelTest extends LinearOpMode {
             telemetry.addData("Battery voltage", battery.getVoltage());
             telemetry.addData("loopMs", loopTimer.milliseconds());
             telemetry.addData("shooting", gamepad1.right_bumper ? 1 : 0);
+            telemetry.addData("feeding", feeding ? 1 : 0);
             loopTimer.reset();
             telemetry.update();
         }

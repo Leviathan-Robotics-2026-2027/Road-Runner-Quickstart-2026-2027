@@ -7,12 +7,12 @@ import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
+import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.teamcode.MecanumDrive;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Drivetrain;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Flywheel;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Intake;
-import org.firstinspires.ftc.teamcode.ProgrammingBoards.Ramp;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Turret;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Transfer;
 
@@ -25,7 +25,6 @@ public class TeleRedLeft extends LinearOpMode {
     private Transfer transfer;
     private Turret turret;
     private Drivetrain drivetrain;
-    private Ramp ramp;
 
     @Override
     public void runOpMode() throws InterruptedException {
@@ -36,10 +35,9 @@ public class TeleRedLeft extends LinearOpMode {
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(-60, -60, Math.toRadians(0)));
         drivetrain = new Drivetrain(hardwareMap);
         flywheel = new Flywheel(hardwareMap);
-        intake = new Intake(hardwareMap);
+        intake = new Intake(hardwareMap); //ramp starts straight up
         transfer = new Transfer(hardwareMap);
         turret = new Turret(hardwareMap);
-        ramp = new Ramp(hardwareMap); //starts straight up
 
         VoltageSensor battery = hardwareMap.voltageSensor.iterator().next();
         double speed = 1; //flywheel speed
@@ -48,6 +46,9 @@ public class TeleRedLeft extends LinearOpMode {
         boolean lastDpadLeft = false;
         boolean lastDpadRight = false;
         boolean lastSquare = false;
+        boolean lastCircle = false;
+        boolean outtaking = false;
+        ElapsedTime outtakeTimer = new ElapsedTime();
 
         waitForStart();
         boolean findingStart = turret.canFindStart();
@@ -82,7 +83,7 @@ public class TeleRedLeft extends LinearOpMode {
 
             //gamepad 1 right bumper toggles the ramp up and down
             if (gamepad1.right_bumper && !lastRampButton) {
-                ramp.toggle();
+                intake.toggleRamp();
             }
             lastRampButton = gamepad1.right_bumper;
 
@@ -119,19 +120,27 @@ public class TeleRedLeft extends LinearOpMode {
             }
 
             //gamepad 2 runs the intake and transfer
-            transfer.run(gamepad2.right_bumper ? 1 : 0);
+            //only feeds while the flywheel is up to speed, see Transfer speedGate
+            boolean feeding = transfer.feed(gamepad2.right_bumper, flywheel.returnVel(), speed * shotVelocity);
 
             intake.runIntake(gamepad2.left_bumper ? 1 : 0);
 
 
-            //circle runs the intake and transfer backwards
-            if (gamepad2.circle) {
+            //circle outtakes the intake for 0.08 seconds to spit out one ball, same if tapped or held
+            if (gamepad2.circle && !lastCircle) {
+                outtaking = true;
+                outtakeTimer.reset();
+            }
+            lastCircle = gamepad2.circle;
+            if (outtaking && outtakeTimer.seconds() < 0.08) {
                 intake.runIntake(-1);
-                transfer.run(-1);
+            } else {
+                outtaking = false;
             }
 
-            telemetry.addData("Velocity", flywheel.returnVel());
+            telemetry.addData("velocity", flywheel.returnVel());
             telemetry.addData("targetVelocity", speed * shotVelocity);
+            telemetry.addData("feeding", feeding ? 1 : 0);
             telemetry.update();
         }
     }
