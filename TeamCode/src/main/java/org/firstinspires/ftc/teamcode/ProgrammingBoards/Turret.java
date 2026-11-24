@@ -557,7 +557,7 @@ public class Turret {
         double dy = goalY - pivotY;
         double distSq = dx * dx + dy * dy;
         if (distSq < 1) {
-            turret.setPower(0);
+            brake(); //holds still instead of coasting
             return;
         }
 
@@ -573,6 +573,26 @@ public class Turret {
         double turretRate = Math.toDegrees(goalAngleRate - robotVel.angVel);
 
         moveToTarget(currentAngle, turretRate);
+    }
+
+    //true if the camera sees any tag on the goal cell, a tipped cell hides its tags
+    public boolean seesGoalTag(Pose2d pose) {
+        if (limelight == null) {
+            return false;
+        }
+        LLResult result = limelight.getLatestResult();
+        if (result == null || !result.isValid() || result.getStaleness() > maxStaleness) {
+            return false;
+        }
+        int side = pose.position.x > sideLineX ? 1 : -1;
+        for (LLResultTypes.FiducialResult tag : result.getFiducialResults()) {
+            double[] tagPosition = findTag(tag.getFiducialId());
+            if (tagPosition != null && (int) tagPosition[2] == side
+                    && Math.signum(tagPosition[1]) == Math.signum(goalY)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     //call every loop, turns the turret straight at the goal cell's april tags
@@ -659,6 +679,13 @@ public class Turret {
         double power = kV / 1000 * turretRate + kD / 1000 * derivative;
         if (Math.abs(error) > tolerance) {
             power += kP / 100 * error + kS / 100 * Math.signum(error);
+        } else {
+            //close enough, push back against any drift instead of just cutting power
+            double rate = getRate();
+            if (Math.abs(rate) > brakeDeadband) {
+                double brakeCap = brakeMaxPower / 100;
+                power += Math.max(-brakeCap, Math.min(brakeCap, -brakeGain / 100 * rate));
+            }
         }
 
         double cap = maxPower / 100;
