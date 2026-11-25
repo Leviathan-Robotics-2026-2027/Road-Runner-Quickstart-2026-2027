@@ -12,6 +12,7 @@ import com.acmerobotics.roadrunner.VelConstraint;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.SleepAction;
+import com.acmerobotics.roadrunner.TrajectoryActionBuilder;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
@@ -30,17 +31,20 @@ import org.firstinspires.ftc.teamcode.ProgrammingBoards.Turret;
 @Autonomous
 public class AutoRedRight extends LinearOpMode {
     //flywheel speed from 0 to 1, 1 is fullSpeedVelocity
-    public static double flywheelSpeed = 1; //0.74 is 740, same as the teleop targetVelocity
-    public static double fullSpeedVelocity = 910; //ticks per second at speed 1
+    public static double flywheelSpeed = 1; //1 is fullSpeedVelocity
+    public static double fullSpeedVelocity = 730; //ticks per second at speed 1
     public static double pickupDistance = 13; //inches it drives forward into the flower after the ramp drops
-    public static double rampDropTime = 0.25; //seconds to wait for the ramp to drop
-    public static double grabTime = 0.65; //seconds it sits in the first flower before backing out and raising the ramp
-    public static double farGrabTime = 0.75; //same for the second flower
-    public static double tagConfirmTime = 0.25; //seconds a tag has to stay in view to count, stops quick false sightings
-    public static double scanTime = 0.75; //seconds to look for a tag on the hive before giving up
-    public static double shootTime = 1.75; //seconds the transfer runs to shoot
+    public static double firstShotMaxWait = 1; //most seconds it waits for the flywheel before the first shot
+    public static double readyTolerance = 20; //ticks per second off the target that counts as up to speed
+    public static double readyHoldTime = 0.15; //seconds it has to stay up to speed, so passing through the target on the way up doesn't count
+    public static double cornerWait = 0.25; //seconds it sits in the corner
+    public static double grabTime = 0.9; //seconds it sits in the first flower before backing out and raising the ramp
+    public static double farGrabTime = 0.9; //same for the second flower
+    public static double tagConfirmTime = 0.1; //seconds a tag has to stay in view to count, stops quick false sightings
+    public static double scanTime = 0.25; //seconds to look for a tag on the hive before giving up
+    public static double shootTime = 1.1; //seconds the transfer runs to shoot
     public static double farPickupDistance = 13; //inches it moves into the far flower
-    public static double crossSpeed = 1; //speed multiplier for the strafe and spline that cross sides
+    public static double crossSpeed = 0.85; //speed multiplier for crossing sides, 0.85 leaves the motors room to correct so it stays smooth
 
     private Flywheel flywheel;
     private Turret turret;
@@ -71,6 +75,7 @@ public class AutoRedRight extends LinearOpMode {
         Pose2d pose0 = new Pose2d(52, -12, Math.toRadians(180)); //6 inches forward from the start
         Pose2d pose1 = new Pose2d(24, -58, Math.toRadians(-90)); //at the flower
         Pose2d facingFlower = new Pose2d(24, -58 + pickupDistance, Math.toRadians(-90)); //stops short, facing the flower
+        Pose2d scanPose = pose0; //scans and shoots again where it shot the first time
         farFlower = new Pose2d(-48, -30, Math.toRadians(180)); //second flower, stays facing 180 so it doesn't turn
         Pose2d farShot = new Pose2d(farFlower.position.x - 10, -18, Math.toRadians(0)); //where the cross ends when it shoots, facing 0
         afterFlowerShot = farShot; //shoots from the same spot after the flower and the corner
@@ -85,11 +90,10 @@ public class AutoRedRight extends LinearOpMode {
         Action pickup = drive.actionBuilder(facingFlower)
                 .strafeTo(pose1.position)
                 .build();
-        //backs out, ramp goes up as it passes where it dropped, then curves back to the hive without stopping
+        //ramp goes up right away and it goes straight back to the scan spot, turning on the way
         Action backToHive = drive.actionBuilder(pose1)
-                .strafeTo(facingFlower.position)
-                .afterDisp(0, () -> intakeBoard.rampUp())
-                .splineToLinearHeading(pose0, directionTo(facingFlower.position, pose0.position))
+                .afterTime(0, () -> intakeBoard.rampUp())
+                .strafeToLinearHeading(scanPose.position, scanPose.heading)
                 .build();
         //crossing sides goes crossSpeed times faster than the other paths
         VelConstraint crossVel = new MinVelConstraint(Arrays.asList(
@@ -99,30 +103,29 @@ public class AutoRedRight extends LinearOpMode {
                 MecanumDrive.PARAMS.minProfileAccel * crossSpeed, MecanumDrive.PARAMS.maxProfileAccel * crossSpeed);
 
         //hive standing: back to the flower spot, then the far flower, ramp drops and it strafes left to pick up
-        Action toFarFlower = drive.actionBuilder(pose0) //both moves in one, no stop between
+        Action toFarFlower = drive.actionBuilder(scanPose) //both moves in one, no stop between
                 .strafeToLinearHeading(midway, Math.toRadians(180), crossVel, crossAccel)
                 //second strafe as a spline so it rounds the corner instead of stopping
-                .splineToLinearHeading(farFlower, directionTo(midway, farFlower.position), crossVel, crossAccel)
+                .splineToLinearHeading(farFlower, arcEndTangent(scanPose.position, midway, farFlower.position), crossVel, crossAccel)
                 .build();
         //hive tipped: same cross, ends at the shot spot instead
-        Action toFarShot = drive.actionBuilder(pose0) //both moves in one, no stop between
+        Action toFarShot = drive.actionBuilder(scanPose) //both moves in one, no stop between
                 .strafeToLinearHeading(midway, Math.toRadians(180), crossVel, crossAccel)
                 //second strafe as a spline so it rounds the corner instead of stopping
-                .splineToLinearHeading(farShot, directionTo(midway, farShot.position), crossVel, crossAccel)
+                .splineToSplineHeading(farShot, arcEndTangent(scanPose.position, midway, farShot.position), crossVel, crossAccel) //turn eases in and out
                 .build();
 
         waitForStart();
         if (isStopRequested()) return;
 
         run(path0);
-        run(new SleepAction(1.45)); //waits before the first shot
+        waitForFlywheel(firstShotMaxWait); //shoots as soon as the flywheel is up to speed
         intake = true; //intake and transfer start after the 6 inches
         transfer = true;
-        run(new SleepAction(1.25));
+        run(new SleepAction(shootTime));
         transfer = false; //done shooting, intake keeps going
         run(path1); //stops facing the flower
-        intakeBoard.rampDown(); //ramp drops to pick up
-        run(new SleepAction(rampDropTime));
+        intakeBoard.rampDown(); //ramp drops while it drives in, no wait
         run(pickup); //drives forward into the flower
         run(new SleepAction(grabTime)); //a little longer to grab the balls
         run(backToHive); //back to where it shot the first time
@@ -137,34 +140,25 @@ public class AutoRedRight extends LinearOpMode {
             intake = false; //intake off while crossing sides
             run(toFarFlower);
             intake = true; //movement done, intake back on
-            farFlowerAndShoot(); //picks up, turns around and shoots facing 0
+            farFlowerAndShoot(); //picks up, turns around on the way to the shot spot and shoots
 
-            //corner pickup from meep meep, intake stays on
-            Vector2d cornerFront = new Vector2d(-41, -60);
-            Vector2d corner = new Vector2d(-41, -72); //pushes into the wall
-            run(drive.actionBuilder(afterFlowerShot)
-                    .strafeToLinearHeading(cornerFront, Math.toRadians(270))
-                    .strafeTo(corner)
-                    .build());
-            run(new SleepAction(0.5));
-            //goes back exactly the way it came
-            run(drive.actionBuilder(new Pose2d(corner, Math.toRadians(270)))
-                    .strafeTo(cornerFront)
-                    .strafeToLinearHeading(afterFlowerShot.position, afterFlowerShot.heading)
-                    .build());
+            cornerPickup(afterFlowerShot, null);
             shoot();
         } else {
             intake = false; //intake stops right before crossing sides
             run(toFarShot);
             intake = true; //movement done, intake back on
             run(new SleepAction(0.5)); //lets the flywheel settle before shooting
-            shoot();
+            shoot(); //shoots the balls from the first flower
 
-            //turns around and goes to the far flower, then same as the other case
+            //turns around on the way to the second flower, then the same flower and corner steps as the other case
             run(drive.actionBuilder(farShot)
                     .strafeToLinearHeading(farFlower.position, farFlower.heading)
                     .build());
-            farFlowerAndShoot();
+            farFlowerAndShoot(); //picks up, turns around on the way to the shot spot and shoots
+            cornerPickup(afterFlowerShot, null); //ends at the shot spot facing 0
+
+            shoot(); //shoots on this side either way
         }
 
         flywheel.update(0, battery.getVoltage());
@@ -172,11 +166,31 @@ public class AutoRedRight extends LinearOpMode {
         transferBoard.run(0);
     }
 
+    //corner pickup from meep meep, starts and ends at the shot spot facing 0, intake stays on
+    //backOut is a spot to back up to first, null goes straight there
+    private void cornerPickup(Pose2d start, Vector2d backOut) {
+        Vector2d cornerFront = new Vector2d(-39, -60);
+        Vector2d corner = new Vector2d(-39, -72); //pushes into the wall
+        TrajectoryActionBuilder toCorner = drive.actionBuilder(start);
+        if (backOut != null) {
+            toCorner = toCorner.strafeTo(backOut);
+        }
+        run(toCorner
+                .strafeToLinearHeading(cornerFront, Math.toRadians(270))
+                .strafeTo(corner)
+                .build());
+        run(new SleepAction(cornerWait));
+        //goes back exactly the way it came
+        run(drive.actionBuilder(new Pose2d(corner, Math.toRadians(270)))
+                .strafeTo(cornerFront)
+                .strafeToLinearHeading(afterFlowerShot.position, afterFlowerShot.heading)
+                .build());
+    }
+
     //at the far flower facing 180: ramp drops, drives in, grabs, backs out, turns around on the way to the shot spot and shoots
     private void farFlowerAndShoot() {
         Vector2d pickupSpot = new Vector2d(farFlower.position.x - farPickupDistance, farFlower.position.y);
-        intakeBoard.rampDown(); //ramp drops to pick up
-        run(new SleepAction(rampDropTime));
+        intakeBoard.rampDown(); //ramp drops while it drives in, no wait
         run(drive.actionBuilder(farFlower)
                 .strafeTo(pickupSpot) //forward into the flower
                 .build());
@@ -196,9 +210,44 @@ public class AutoRedRight extends LinearOpMode {
         transfer = false;
     }
 
+    //end direction that makes the spline after a strafe one smooth curve instead of an s-bend
+    private static double arcEndTangent(Vector2d start, Vector2d corner, Vector2d end) {
+        double chord = directionTo(corner, end);
+        double into = directionTo(start, corner);
+        double bend = Math.atan2(Math.sin(chord - into), Math.cos(chord - into));
+        return chord + bend;
+    }
+
     //direction in radians pointing from one spot to another
     private static double directionTo(Vector2d from, Vector2d to) {
         return Math.atan2(to.y - from.y, to.x - from.x);
+    }
+
+    //waits until the flywheel stays up to speed for readyHoldTime, or maxWait runs out
+    private void waitForFlywheel(double maxWait) {
+        ElapsedTime waitTimer = new ElapsedTime();
+        ElapsedTime readyTimer = new ElapsedTime();
+        boolean ready = false;
+        while (opModeIsActive() && waitTimer.seconds() < maxWait) {
+            drive.updatePoseEstimate();
+            Pose2d pose = drive.localizer.getPose();
+            double target = flywheelSpeed * fullSpeedVelocity;
+            flywheel.update(target, battery.getVoltage());
+            turret.aimAtGoal(pose, new PoseVelocity2d(new Vector2d(0, 0), 0));
+            intakeBoard.runIntake(intake ? 1 : 0);
+            transferBoard.run(transfer ? 1 : 0);
+            if (Math.abs(target - flywheel.returnVel()) <= readyTolerance) {
+                if (!ready) {
+                    ready = true;
+                    readyTimer.reset();
+                }
+                if (readyTimer.seconds() >= readyHoldTime) {
+                    return;
+                }
+            } else {
+                ready = false;
+            }
+        }
     }
 
     //waits up to scanTime for a tag on the hive, true if it sees one

@@ -20,7 +20,7 @@ import org.firstinspires.ftc.teamcode.ProgrammingBoards.Transfer;
 @TeleOp(name = "TeleRedLeft_SingleController")
 public class TeleRedLeft_SingleController extends LinearOpMode {
     //edit live in the dashboard config tab, flywheel pidf is under Flywheel
-    public static double targetVelocity = 740; //close shot speed in ticks per second
+    public static double targetVelocity = 730; //close shot speed in ticks per second
     public static double driveSpeed = 0.7; //drivetrain speed, 1 is full
 
     //flywheel speeds up the farther the robot is from the goal

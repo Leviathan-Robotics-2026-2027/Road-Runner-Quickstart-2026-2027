@@ -10,7 +10,7 @@ import com.qualcomm.robotcore.hardware.Servo;
 public class Intake {
     //edit these live in the dashboard config tab
     public static double rampUpPosition = 0.5; //servo position where the ramp points straight up
-    public static double rampDownDegrees = 180; //degrees the ramp moves down from straight up
+    public static double rampDownDegrees = 150; //degrees the ramp moves down from straight up
     public static double rampServoRange = 300; //degrees the servo turns from 0 to 1
     public static double rampDownDirection = -1; //flip to 1 if the ramp goes the wrong way
 

@@ -19,7 +19,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 @TeleOp(name = "FlywheelTest")
 public class FlywheelTest extends LinearOpMode {
     //edit live in the dashboard config tab, flywheel pidf is under Flywheel
-    public static double testVelocity = 740; //ticks per second
+    public static double testVelocity = 730; //ticks per second
     public static double velocityStep = 10; //dpad up and down change speed by this
     public static double maxTestVelocity = 1000; //speed never goes above this
 
