@@ -11,12 +11,13 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 public class Flywheel {
     //edit these live in the dashboard config tab
     //kV, kP, kD are divided by 10000 in the math so they stay whole-ish numbers
-    public static double kV = 8.7; //base power for a speed
-    public static double kS = 0.05; //percent power to overcome friction
+    public static double kV = 8.6; //base power for a speed
+    public static double kS = 0; //percent power to overcome friction
     public static double kP = 55; //push back against speed error
-    public static double kD = 0.25; //damps fast changes
+    public static double kD = 0.4; //damps fast changes
     public static double nominalVoltage = 12; //voltage kV and kS are tuned for
-    public static boolean batteryScaling = true; //true scales the feedforward to the battery voltage
+    public static boolean batteryScaling = false; //true scales the feedforward to the battery voltage
+    public static double voltageSmoothing = 0.05; //0 to 1, how fast the battery reading follows changes, low ignores quick dips from other motors
 
     private static final double gainScale = 10000;
 
@@ -24,6 +25,7 @@ public class Flywheel {
     private final ElapsedTime timer = new ElapsedTime();
     private double lastError = 0;
     private double lastPower = 0;
+    private double smoothVoltage = -1; //battery voltage with the quick dips smoothed out
 
     public Flywheel(HardwareMap hardwareMap){
         flywheel = hardwareMap.get(DcMotorEx.class, "flywheel");
@@ -56,8 +58,14 @@ public class Flywheel {
 
         double feedforward = kV / gainScale * targetVelocity + kS / 100;
         if (batteryScaling) {
+            //intake and other motors make the reading jump, so follow it slowly
+            if (smoothVoltage < 0) {
+                smoothVoltage = batteryVoltage;
+            } else {
+                smoothVoltage += voltageSmoothing * (batteryVoltage - smoothVoltage);
+            }
             //same speed needs the same numbers on any charge
-            feedforward *= nominalVoltage / batteryVoltage;
+            feedforward *= nominalVoltage / smoothVoltage;
         }
         double feedback = (kP * error + kD * derivative) / gainScale;
 
