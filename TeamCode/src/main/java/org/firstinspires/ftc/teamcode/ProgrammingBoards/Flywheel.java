@@ -11,10 +11,11 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 public class Flywheel {
     //edit these live in the dashboard config tab
     //kV, kP, kD are divided by 10000 in the math so they stay whole-ish numbers
+    public static double shotVelocity = 765; //flywheel speed every auton and teleop uses, ticks per second
     public static double kV = 8.6; //base power for a speed
     public static double kS = 0; //percent power to overcome friction
-    public static double kP = 55; //push back against speed error
-    public static double kD = 0.4; //damps fast changes
+    public static double kP = 75; //push back against speed error
+    public static double kD = 0.4; //dam ps fast changes
     public static double nominalVoltage = 12; //voltage kV and kS are tuned for
     public static boolean batteryScaling = false; //true scales the feedforward to the battery voltage
     public static double voltageSmoothing = 0.05; //0 to 1, how fast the battery reading follows changes, low ignores quick dips from other motors

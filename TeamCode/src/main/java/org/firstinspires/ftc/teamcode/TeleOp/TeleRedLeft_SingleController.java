@@ -5,12 +5,14 @@ import com.acmerobotics.dashboard.config.Config;
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
+import com.acmerobotics.roadrunner.Vector2d;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
+import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.teamcode.MecanumDrive;
-import org.firstinspires.ftc.teamcode.ProgrammingBoards.Drivetrain;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Flywheel;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Intake;
 import org.firstinspires.ftc.teamcode.ProgrammingBoards.Turret;
@@ -20,12 +22,10 @@ import org.firstinspires.ftc.teamcode.ProgrammingBoards.Transfer;
 @TeleOp(name = "TeleRedLeft_SingleController")
 public class TeleRedLeft_SingleController extends LinearOpMode {
     //edit live in the dashboard config tab, flywheel pidf is under Flywheel
-    public static double targetVelocity = 730; //close shot speed in ticks per second
-    public static double driveSpeed = 0.7; //drivetrain speed, 1 is full
 
     //flywheel speeds up the farther the robot is from the goal
-    public static boolean distanceSpeed = false; //false uses targetVelocity everywhere
-    public static double closeDistance = 32; //inches, at or closer than this uses targetVelocity
+    public static boolean distanceSpeed = false; //false uses Flywheel.shotVelocity everywhere
+    public static double closeDistance = 32; //inches, at or closer than this uses Flywheel.shotVelocity
     public static double farDistance = 48; //inches of the farthest shot distance
     public static double farVelocity = 760; //shot speed at farDistance
     public static double maxVelocity = 760; //speed never goes above this
@@ -34,7 +34,6 @@ public class TeleRedLeft_SingleController extends LinearOpMode {
     private Intake intake;
     private Transfer transfer;
     private Turret turret;
-    private Drivetrain drivetrain;
 
     @Override
     public void runOpMode() throws InterruptedException {
@@ -43,7 +42,6 @@ public class TeleRedLeft_SingleController extends LinearOpMode {
         telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
 
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(-60, -60, Math.toRadians(0)));
-        drivetrain = new Drivetrain(hardwareMap);
         flywheel = new Flywheel(hardwareMap);
         intake = new Intake(hardwareMap); //ramp starts straight up
         transfer = new Transfer(hardwareMap);
@@ -58,9 +56,31 @@ public class TeleRedLeft_SingleController extends LinearOpMode {
         boolean lastSquare = false;
 
         waitForStart();
+        ElapsedTime matchTimer = new ElapsedTime(); //teleop is 2 minutes
+        boolean warned30 = false;
+        boolean warned10 = false;
+        boolean warnedEnd = false;
         boolean findingStart = turret.canFindStart();
 
         while (!isStopRequested() && opModeIsActive()) {
+            //3 rumbles with 30 seconds left, 2 rumbles with 10 seconds left
+            if (!warned30 && matchTimer.seconds() >= 90) {
+                gamepad1.rumbleBlips(3);
+                gamepad2.rumbleBlips(3);
+                warned30 = true;
+            }
+            if (!warned10 && matchTimer.seconds() >= 110) {
+                gamepad1.rumbleBlips(2);
+                gamepad2.rumbleBlips(2);
+                warned10 = true;
+            }
+            //teleop is over at 2 minutes, rumbles until it's stopped
+            if (!warnedEnd && matchTimer.seconds() >= 120) {
+                gamepad1.rumble(Gamepad.RUMBLE_DURATION_CONTINUOUS);
+                gamepad2.rumble(Gamepad.RUMBLE_DURATION_CONTINUOUS);
+                warnedEnd = true;
+            }
+
             PoseVelocity2d robotVel = drive.updatePoseEstimate();
             Pose2d currentPose = drive.localizer.getPose();
 
@@ -68,21 +88,21 @@ public class TeleRedLeft_SingleController extends LinearOpMode {
             if (gamepad1.square && !lastSquare) {
                 currentPose = new Pose2d(-60, -60, currentPose.heading.toDouble());
                 drive.localizer.setPose(currentPose);
-                gamepad1.rumble(300); //tells the driver the reset happened
+                gamepad1.rumble(1000); //1 second rumble on both so everyone knows the reset happened
+                gamepad2.rumble(1000);
             }
             lastSquare = gamepad1.square;
 
             boolean sticksReleased = Math.abs(gamepad1.left_stick_y) < 0.05
                     && Math.abs(gamepad1.left_stick_x) < 0.05
                     && Math.abs(gamepad1.right_stick_x) < 0.05;
-            if (sticksReleased) {
-                drivetrain.brakeMotors();
-            } else {
-                drivetrain.driveMotors(gamepad1.left_stick_y * driveSpeed, gamepad1.right_stick_x * driveSpeed, gamepad1.left_stick_x * driveSpeed);
-            }
+            //same driving as localization test, full speed, sticks released stops and brakes
+            drive.setDrivePowers(new PoseVelocity2d(
+                    new Vector2d(-gamepad1.left_stick_y, -gamepad1.left_stick_x),
+                    -gamepad1.right_stick_x * 0.9)); //turning at 0.9x so it is a little easier to control
             double distanceToGoal = Turret.getDistanceToGoal(currentPose);
             //no distance speed during the sweep, the location isn't known yet
-            double shotVelocity = distanceSpeed && !findingStart ? velocityForDistance(distanceToGoal) : targetVelocity;
+            double shotVelocity = distanceSpeed && !findingStart ? velocityForDistance(distanceToGoal) : Flywheel.shotVelocity;
             flywheel.update(speed * shotVelocity, battery.getVoltage());
 
             //cross toggles the ramp up and down
@@ -150,8 +170,8 @@ public class TeleRedLeft_SingleController extends LinearOpMode {
 
     //straight line through the close and far speeds, kept between the close speed and maxVelocity
     static double velocityForDistance(double distance) {
-        double slope = (farVelocity - targetVelocity) / (farDistance - closeDistance);
-        double velocity = targetVelocity + slope * (distance - closeDistance);
-        return Math.max(targetVelocity, Math.min(maxVelocity, velocity));
+        double slope = (farVelocity - Flywheel.shotVelocity) / (farDistance - closeDistance);
+        double velocity = Flywheel.shotVelocity + slope * (distance - closeDistance);
+        return Math.max(Flywheel.shotVelocity, Math.min(maxVelocity, velocity));
     }
 }

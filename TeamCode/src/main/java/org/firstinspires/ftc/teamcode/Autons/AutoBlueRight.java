@@ -32,17 +32,16 @@ import org.firstinspires.ftc.teamcode.ProgrammingBoards.Turret;
 @Autonomous
 //same as AutoRedRight mirrored to the opposite corner, every x and y flipped and every angle turned 180
 public class AutoBlueRight extends LinearOpMode {
-    //flywheel speed from 0 to 1, 1 is fullSpeedVelocity
-    public static double flywheelSpeed = 1; //1 is fullSpeedVelocity
-    public static double fullSpeedVelocity = 730; //ticks per second at speed 1
     public static double pickupDistance = 15; //inches it drives forward into the flower after the ramp drops
     public static double firstShotMaxWait = 1; //most seconds it waits for the flywheel before the first shot
     public static double readyTolerance = 20; //ticks per second off the target that counts as up to speed
     public static double readyHoldTime = 0.15; //seconds it has to stay up to speed, so passing through the target on the way up doesn't count
-    public static double cornerWait = 0.15; //seconds it sits in the corner
+    public static double cornerWait = 0; //seconds it sits in the corner
     public static double preShootWait = 0.25; //seconds it waits before the transfer turns on for every shot
     public static double farFlowerShotExtraWait = 0.15; //extra wait before the shot after the second flower
     public static double firstRampEarlyTime = 0.5; //seconds before reaching the first flower that the ramp starts dropping
+    public static double flowerAimOffset = -4; //degrees the aim moves again before and again after the second flower, negative is right
+    public static double crossAimOffset = -4; //degrees the turret aim moves after the cross, negative is right
     public static double rampEarlyTime = 0.75; //same for the second flower
     public static double rampRetractDistance = 6; //inches out of the flower before the ramp goes up, happens while moving so it adds no time
     public static double grabTime = 1.05; //seconds it sits in the first flower before backing out and raising the ramp
@@ -96,7 +95,7 @@ public class AutoBlueRight extends LinearOpMode {
         Pose2d pose1 = new Pose2d(-24, 58, Math.toRadians(90)); //at the flower
         Pose2d facingFlower = new Pose2d(-24, 58 - pickupDistance, Math.toRadians(90)); //stops short, facing the flower
         Pose2d scanPose = pose0; //scans and shoots again where it shot the first time
-        farFlower = new Pose2d(48, 31, Math.toRadians(0)); //second flower, stays facing 0 so it doesn't turn
+        farFlower = new Pose2d(48, 35, Math.toRadians(0)); //second flower, stays facing 0 so it doesn't turn
         Pose2d farShot = new Pose2d(farFlower.position.x + 10, 18, Math.toRadians(180)); //where the cross ends when it shoots, facing 180
         afterFlowerShot = farShot; //shoots from the same spot after the flower and the corner
         Vector2d midway = new Vector2d(20, 10); //first strafe of the cross
@@ -152,6 +151,7 @@ public class AutoBlueRight extends LinearOpMode {
                     .build());
             intake = true; //movement done, intake back on
             crossed = true;
+            turret.addAimOffset(crossAimOffset); //aim is skewed on this side
             farFlowerAndShoot(); //picks up, turns around on the way to the shot spot and shoots
 
             cornerPickup(afterFlowerShot, null);
@@ -159,6 +159,7 @@ public class AutoBlueRight extends LinearOpMode {
         } else {
             intake = true; //cross is done, intake back on
             crossed = true;
+            turret.addAimOffset(crossAimOffset); //aim is skewed on this side
             run(new SleepAction(0.5)); //lets the flywheel settle before shooting
             shoot(); //shoots the balls from the first flower
 
@@ -172,6 +173,11 @@ public class AutoBlueRight extends LinearOpMode {
             shoot(); //shoots on this side either way
         }
 
+        //parks at the end
+        run(drive.actionBuilder(afterFlowerShot)
+                .strafeTo(new Vector2d(46, 62))
+                .build());
+
         flywheel.update(0, battery.getVoltage());
         intakeBoard.runIntake(0);
         transferBoard.run(0);
@@ -181,7 +187,7 @@ public class AutoBlueRight extends LinearOpMode {
     //backOut is a spot to back up to first, null goes straight there
     private void cornerPickup(Pose2d start, Vector2d backOut) {
         Vector2d cornerFront = new Vector2d(44, 60);
-        Vector2d corner = new Vector2d(44, 72); //pushes into the wall
+        Vector2d corner = new Vector2d(44, 68); //pushes into the wall
         TrajectoryActionBuilder toCorner = drive.actionBuilder(start);
         if (backOut != null) {
             toCorner = toCorner.strafeTo(backOut);
@@ -200,6 +206,7 @@ public class AutoBlueRight extends LinearOpMode {
 
     //at the far flower facing 0: ramp drops, drives in, grabs, backs out, turns around on the way to the shot spot and shoots
     private void farFlowerAndShoot() {
+        turret.addAimOffset(flowerAimOffset); //before the second flower
         Vector2d pickupSpot = new Vector2d(farFlower.position.x + farPickupDistance, farFlower.position.y);
         run(drive.actionBuilder(farFlower)
                 .strafeTo(pickupSpot) //forward into the flower
@@ -211,6 +218,7 @@ public class AutoBlueRight extends LinearOpMode {
                 .strafeTo(farFlower.position) //backs out
                 .strafeToLinearHeading(afterFlowerShot.position, afterFlowerShot.heading) //turns around on the way to the shot spot
                 .build());
+        turret.addAimOffset(flowerAimOffset); //after the second flower
         run(new SleepAction(farFlowerShotExtraWait));
         shoot();
     }
@@ -247,7 +255,7 @@ public class AutoBlueRight extends LinearOpMode {
         while (opModeIsActive() && waitTimer.seconds() < maxWait) {
             drive.updatePoseEstimate();
             Pose2d pose = drive.localizer.getPose();
-            double target = flywheelSpeed * fullSpeedVelocity;
+            double target = Flywheel.shotVelocity;
             flywheel.update(target, battery.getVoltage());
             turret.aimAtGoal(pose, new PoseVelocity2d(new Vector2d(0, 0), 0));
             intakeBoard.runIntake(intake ? 1 : 0);
@@ -278,7 +286,7 @@ public class AutoBlueRight extends LinearOpMode {
             TelemetryPacket packet = new TelemetryPacket();
             running = action.run(packet);
 
-            flywheel.update(flywheelSpeed * fullSpeedVelocity, battery.getVoltage());
+            flywheel.update(Flywheel.shotVelocity, battery.getVoltage());
             Pose2d pose = drive.localizer.getPose();
             turret.aimAtGoal(pose, new PoseVelocity2d(new Vector2d(0, 0), 0));
             intakeBoard.runIntake(intake ? 1 : 0);
@@ -340,7 +348,7 @@ public class AutoBlueRight extends LinearOpMode {
                 dropped = true;
             }
 
-            flywheel.update(flywheelSpeed * fullSpeedVelocity, battery.getVoltage());
+            flywheel.update(Flywheel.shotVelocity, battery.getVoltage());
             Pose2d pose = drive.localizer.getPose();
             turret.aimAtGoal(pose, new PoseVelocity2d(new Vector2d(0, 0), 0));
             intakeBoard.runIntake(intake ? 1 : 0);
@@ -357,7 +365,7 @@ public class AutoBlueRight extends LinearOpMode {
             TelemetryPacket packet = new TelemetryPacket();
             running = action.run(packet);
 
-            double flywheelTarget = flywheelSpeed * fullSpeedVelocity;
+            double flywheelTarget = Flywheel.shotVelocity;
             flywheel.update(flywheelTarget, battery.getVoltage());
             Pose2d pose = drive.localizer.getPose();
             if (!(tagAim && turret.aimAtTag(pose))) {

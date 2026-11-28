@@ -37,14 +37,14 @@ public class Turret {
     //at 180 (facing backwards) it spins all the way around to -180
     public static double minAngle = -180;
     public static double maxAngle = 180;
-    public static double wrapBuffer = 15; //degrees past the limit before it spins around, stops flip flopping at 180
+    public static double wrapBuffer = 15; //degrees past the limit before it spins around, stops flip-flopping at 180
 
     //aim gains, divided in the math so they stay normal numbers
     public static double kP = 2; //percent power per degree off
     public static double kD = 0; //damps fast changes in error
     public static double kV = 0; //helps keep up while the robot turns or drives
     public static double kS = 0; //percent power to overcome friction
-    public static double tolerance = 3; //degrees, close enough to stop
+    public static double tolerance = 4; //degrees, close enough to stop
     public static double maxPower = 60; //percent power cap
 
     public static double turretSpeed = -0.2; //manual stick speed
@@ -200,6 +200,11 @@ public class Turret {
     //positive direction = counterclockwise
     public void adjustAim(double direction) {
         aimOffset += direction * aimStep;
+    }
+
+    //moves the aim by this many degrees, counterclockwise is positive
+    public void addAimOffset(double degrees) {
+        aimOffset += degrees;
     }
 
     public double getTargetAngle() {

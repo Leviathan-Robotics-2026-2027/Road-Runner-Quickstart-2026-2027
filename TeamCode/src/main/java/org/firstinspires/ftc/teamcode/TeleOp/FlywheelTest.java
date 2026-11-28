@@ -19,8 +19,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 @TeleOp(name = "FlywheelTest")
 public class FlywheelTest extends LinearOpMode {
     //edit live in the dashboard config tab, flywheel pidf is under Flywheel
-    public static double testVelocity = 740; //ticks per second
-    public static double velocityStep = 10; //dpad up and down change speed by this
+    public static double velocityStep = 5; //dpad up and down change speed by this
     public static double maxTestVelocity = 1000; //speed never goes above this
 
     @Override
@@ -34,6 +33,7 @@ public class FlywheelTest extends LinearOpMode {
         Transfer transfer = new Transfer(hardwareMap);
         VoltageSensor battery = hardwareMap.voltageSensor.iterator().next();
 
+        double testVelocity = Flywheel.shotVelocity; //starts at the shared speed, dpad changes it for this run only
         boolean lastDpadUp = false;
         boolean lastDpadDown = false;
         boolean lastSquare = false;
@@ -77,15 +77,15 @@ public class FlywheelTest extends LinearOpMode {
                 outtaking = false;
             }
 
-            telemetry.addData("targetVelocity", testVelocity);
-            telemetry.addData("velocity", flywheel.returnVel());
-            telemetry.addData("percentError", percentError);
-            telemetry.addData("error", error);
-            telemetry.addData("Flywheel power", flywheel.returnPower());
-            telemetry.addData("Battery voltage", battery.getVoltage());
-            telemetry.addData("loopMs", loopTimer.milliseconds());
-            telemetry.addData("shooting", gamepad1.right_bumper ? 1 : 0);
-            telemetry.addData("feeding", feeding ? 1 : 0);
+            telemetry.addData("Target", testVelocity);
+            telemetry.addData("Actual", flywheel.returnVel());
+//            telemetry.addData("percentError", percentError);
+//            telemetry.addData("error", error);
+//            telemetry.addData("Flywheel power", flywheel.returnPower());
+//            telemetry.addData("Battery voltage", battery.getVoltage());
+//            telemetry.addData("loopMs", loopTimer.milliseconds());
+//            telemetry.addData("shooting", gamepad1.right_bumper ? 1 : 0);
+//            telemetry.addData("feeding", feeding ? 1 : 0);
             loopTimer.reset();
             telemetry.update();
         }
